@@ -1,0 +1,11 @@
+config.json
+config.*.json
+input/
+output/
+output-*/
+work/
+work-*/
+*.log
+models/
+__pycache__/
+

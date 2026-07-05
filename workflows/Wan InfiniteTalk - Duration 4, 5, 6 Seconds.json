@@ -1,0 +1,428 @@
+{
+  "17": {
+    "inputs": {
+      "conditioning": [
+        "14",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "Conditioning Zero Out"
+    }
+  },
+  "13": {
+    "inputs": {
+      "unet_name": "wan2.1\\Wan2_1-I2V-14B-480p_fp8_e4m3fn_scaled_KJ.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "33": {
+    "inputs": {
+      "lora_name": "wan2.2\\lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+      "strength_model": 1,
+      "model": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "112": {
+    "inputs": {
+      "name": "wan2.1_infiniteTalk_single_fp16.safetensors"
+    },
+    "class_type": "ModelPatchLoader",
+    "_meta": {
+      "title": "Load Model Patch"
+    }
+  },
+  "26": {
+    "inputs": {
+      "audio_encoder_name": "wav2vec2-chinese-base_fp16.safetensors"
+    },
+    "class_type": "AudioEncoderLoader",
+    "_meta": {
+      "title": "Load Audio Encoder"
+    }
+  },
+  "16": {
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "29": {
+    "inputs": {
+      "vae_name": "Wan2_1_VAE_bf16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "130": {
+    "inputs": {
+      "mode": "single_speaker",
+      "length": 81,
+      "motion_frame_count": 9,
+      "audio_scale": 1,
+      "model": [
+        "33",
+        0
+      ],
+      "model_patch": [
+        "112",
+        0
+      ],
+      "positive": [
+        "14",
+        0
+      ],
+      "negative": [
+        "17",
+        0
+      ],
+      "vae": [
+        "29",
+        0
+      ],
+      "width": [
+        "149",
+        0
+      ],
+      "height": [
+        "150",
+        0
+      ],
+      "audio_encoder_output_1": [
+        "25",
+        0
+      ],
+      "start_image": [
+        "32",
+        0
+      ],
+      "previous_frames": [
+        "119",
+        0
+      ]
+    },
+    "class_type": "WanInfiniteTalkToVideo",
+    "_meta": {
+      "title": "WanInfiniteTalkToVideo"
+    }
+  },
+  "14": {
+    "inputs": {
+      "text": "the character is talking",
+      "clip": [
+        "16",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "25": {
+    "inputs": {
+      "audio_encoder": [
+        "26",
+        0
+      ],
+      "audio": [
+        "171",
+        0
+      ]
+    },
+    "class_type": "AudioEncoderEncode",
+    "_meta": {
+      "title": "AudioEncoderEncode"
+    }
+  },
+  "150": {
+    "inputs": {
+      "value": 720
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Height"
+    }
+  },
+  "149": {
+    "inputs": {
+      "value": 1280
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Width"
+    }
+  },
+  "119": {
+    "inputs": {
+      "samples": [
+        "180",
+        0
+      ],
+      "vae": [
+        "29",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "180": {
+    "inputs": {
+      "seed": "__RANDOM_INT__",
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "normal",
+      "denoise": 1,
+      "model": [
+        "129",
+        0
+      ],
+      "positive": [
+        "129",
+        1
+      ],
+      "negative": [
+        "129",
+        2
+      ],
+      "latent_image": [
+        "129",
+        3
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "129": {
+    "inputs": {
+      "mode": "single_speaker",
+      "length": 81,
+      "motion_frame_count": 9,
+      "audio_scale": 1,
+      "model": [
+        "33",
+        0
+      ],
+      "model_patch": [
+        "112",
+        0
+      ],
+      "positive": [
+        "14",
+        0
+      ],
+      "negative": [
+        "17",
+        0
+      ],
+      "vae": [
+        "29",
+        0
+      ],
+      "width": [
+        "149",
+        0
+      ],
+      "height": [
+        "150",
+        0
+      ],
+      "audio_encoder_output_1": [
+        "25",
+        0
+      ],
+      "start_image": [
+        "32",
+        0
+      ]
+    },
+    "class_type": "WanInfiniteTalkToVideo",
+    "_meta": {
+      "title": "WanInfiniteTalkToVideo"
+    }
+  },
+  "181": {
+    "inputs": {
+      "seed": "__RANDOM_INT__",
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "normal",
+      "denoise": 1,
+      "model": [
+        "130",
+        0
+      ],
+      "positive": [
+        "130",
+        1
+      ],
+      "negative": [
+        "130",
+        2
+      ],
+      "latent_image": [
+        "130",
+        3
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "124": {
+    "inputs": {
+      "samples": [
+        "181",
+        0
+      ],
+      "vae": [
+        "29",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "126": {
+    "inputs": {
+      "length": 4096,
+      "image": [
+        "124",
+        0
+      ],
+      "batch_index": [
+        "130",
+        4
+      ]
+    },
+    "class_type": "ImageFromBatch",
+    "_meta": {
+      "title": "Get Image from Batch"
+    }
+  },
+  "168": {
+    "inputs": {
+      "images.image0": [
+        "119",
+        0
+      ],
+      "images.image1": [
+        "126",
+        0
+      ]
+    },
+    "class_type": "BatchImagesNode",
+    "_meta": {
+      "title": "Batch Images"
+    }
+  },
+  "182": {
+    "inputs": {
+      "frame_rate": 25,
+      "loop_count": 0,
+      "filename_prefix": "InfiniteTalk",
+      "format": "video/h264-mp4",
+      "pingpong": false,
+      "save_output": true,
+      "images": [
+        "168",
+        0
+      ],
+      "audio": [
+        "171",
+        0
+      ],
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": false,
+      "trim_to_audio": true
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "Video Combine 🎥🅥🅗🅢"
+    }
+  },
+  "32": {
+    "inputs": {
+      "image": "WanWoman.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "171": {
+    "inputs": {
+      "audio": "WomanVoice6Sec.mp3",
+      "start_time": 0,
+      "duration": 0,
+      "audiopreview": {
+        "params": {
+          "start_time": 0,
+          "duration": 0,
+          "filename": "WomanVoice6Sec.mp3",
+          "type": "input"
+        }
+      }
+    },
+    "class_type": "VHS_LoadAudioUpload",
+    "_meta": {
+      "title": "Load Audio (Upload)🎥🅥🅗🅢"
+    }
+  },
+  "173": {
+    "inputs": {
+      "frame_rate": 25,
+      "loop_count": 0,
+      "filename_prefix": "InfiniteTalk",
+      "format": "video/h264-mp4",
+      "pingpong": false,
+      "save_output": false,
+      "images": [
+        "119",
+        0
+      ],
+      "audio": [
+        "171",
+        0
+      ],
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": false,
+      "trim_to_audio": false
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "Video Combine 🎥🅥🅗🅢"
+    }
+  }
+}
