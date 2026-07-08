@@ -33,9 +33,11 @@ def timecode_seconds(value: str) -> float:
 
 def normalize_scene_type(value: str) -> str:
     mapping = {
+        "still": "Still Image + Ken Burn",
         "still image": "Still Image + Ken Burn",
         "still image + ken burn": "Still Image + Ken Burn",
         "ken burn": "Still Image + Ken Burn",
+        "split": "Avatar/Split-screen",
         "split screen": "Avatar/Split-screen",
         "avatar/split-screen": "Avatar/Split-screen",
         "avatar / split-screen": "Avatar/Split-screen",

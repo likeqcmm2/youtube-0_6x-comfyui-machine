@@ -18,6 +18,11 @@ fi
 echo "==> Running ComfyUI + InfiniteTalk + LTX installer"
 bash "$INSTALLER"
 
+echo "==> Installing production workflow Python dependencies"
+# The production runner reads the daily storyboard from .xlsx files.
+source /venv/main/bin/activate
+pip install -U openpyxl
+
 echo "==> Installing packaged ComfyUI workflows"
 mkdir -p "$WORKFLOW_DIR"
 cp -f "$ROOT_DIR/workflows/LTX_I2V_FFLF_85frames_input_enabled.json" "$WORKFLOW_DIR/"
