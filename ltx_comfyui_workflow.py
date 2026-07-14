@@ -243,11 +243,11 @@ def assemble_youtube_final(
     fps: int,
     motion_speed: float,
 ) -> None:
-    inputs = []
-    filters = []
     frame_rows = ["scene,type,frames"]
     previous_end_frame = 0
     motion_count = 0
+    segment_dir = work_dir / "assemble-motion-0.6x-youtube1080-segments"
+    segment_dir.mkdir(parents=True, exist_ok=True)
 
     for idx, item in enumerate(scenes):
         scene = item["scene"]
@@ -261,49 +261,73 @@ def assemble_youtube_final(
             raise RuntimeError(f"Scene {scene} invalid frame count {frames}")
         previous_end_frame = end_frame
         frame_rows.append(f"{scene},{item['type']},{frames}")
-        inputs += ["-i", str(src)]
 
-        chain = (
-            f"[{idx}:v]"
+        segment = segment_dir / f"{idx:04d}_scene_{scene}.mp4"
+        if segment.exists():
+            continue
+
+        vf = (
             "scale=1920:1080:force_original_aspect_ratio=increase,"
             "crop=1920:1080,"
             "setpts=PTS-STARTPTS,"
         )
         if item["type"] == "Motion" and motion_speed != 1.0:
             motion_count += 1
-            chain += f"setpts=PTS/{motion_speed},"
-        chain += (
+            vf += f"setpts=PTS/{motion_speed},"
+        vf += (
             f"fps={fps},"
             "tpad=stop_mode=clone:stop=-1,"
             f"trim=end_frame={frames},"
-            f"setpts=N/({fps}*TB)[v{idx}]"
+            f"setpts=N/({fps}*TB),"
+            "format=yuv420p"
         )
-        filters.append(chain)
+        run([
+            ffmpeg, "-nostdin", "-y",
+            "-i", str(src),
+            "-vf", vf,
+            "-an",
+            "-c:v", "libx264",
+            "-preset", "medium",
+            "-b:v", "10M",
+            "-maxrate", "12M",
+            "-bufsize", "20M",
+            "-r", str(fps),
+            "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart",
+            str(segment),
+        ], f"Final segment assembly failed: {segment}")
 
-    filters.append("".join(f"[v{i}]" for i in range(len(scenes))) + f"concat=n={len(scenes)}:v=1:a=0[outv]")
-
-    work_dir.mkdir(parents=True, exist_ok=True)
-    filter_path = work_dir / "assemble-motion-0.6x-youtube1080-filter.txt"
     counts_path = work_dir / "assemble-motion-0.6x-youtube1080-frame-counts.csv"
-    filter_path.write_text(";".join(filters), encoding="ascii")
     counts_path.write_text("\n".join(frame_rows) + "\n", encoding="utf-8")
 
     total_frames = previous_end_frame
     duration = total_frames / fps
+
+    def concat_quote(path: Path) -> str:
+        return "'" + str(path).replace("'", "'\\''") + "'"
+
+    concat_list = work_dir / "assemble-motion-0.6x-youtube1080-concat.txt"
+    concat_video = work_dir / "assemble-motion-0.6x-youtube1080-video-only.mp4"
+    concat_list.write_text(
+        "\n".join(f"file {concat_quote(segment_dir / f'{idx:04d}_scene_{item['scene']}.mp4')}" for idx, item in enumerate(scenes)) + "\n",
+        encoding="utf-8",
+    )
     run([
         ffmpeg, "-nostdin", "-y",
-        *inputs,
+        "-f", "concat",
+        "-safe", "0",
+        "-i", str(concat_list),
+        "-c", "copy",
+        str(concat_video),
+    ], f"Final video concat failed: {concat_video}")
+
+    run([
+        ffmpeg, "-nostdin", "-y",
+        "-i", str(concat_video),
         "-i", str(voice),
-        "-filter_complex_script", str(filter_path),
-        "-map", "[outv]",
-        "-map", f"{len(scenes)}:a:0",
-        "-c:v", "libx264",
-        "-preset", "medium",
-        "-b:v", "10M",
-        "-maxrate", "12M",
-        "-bufsize", "20M",
-        "-r", str(fps),
-        "-pix_fmt", "yuv420p",
+        "-map", "0:v:0",
+        "-map", "1:a:0",
+        "-c:v", "copy",
         "-c:a", "aac",
         "-b:a", "384k",
         "-t", f"{duration:.6f}",
