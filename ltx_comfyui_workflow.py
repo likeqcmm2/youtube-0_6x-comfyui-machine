@@ -24,11 +24,110 @@ def run(cmd: list[str], failure: str) -> None:
 
 
 def timecode_seconds(value: str) -> float:
-    match = re.match(r"^(\d{1,2}):(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?$", value.strip())
-    if not match:
-        raise ValueError(f"Invalid timecode: {value}")
-    frac = (match.group(4) or "0").ljust(3, "0")[:3]
-    return int(match.group(1)) * 3600 + int(match.group(2)) * 60 + int(match.group(3)) + int(frac) / 1000
+    value = value.strip()
+    match = re.match(r"^(\d{1,2}):(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?$", value)
+    if match:
+        frac = (match.group(4) or "0").ljust(3, "0")[:3]
+        return int(match.group(1)) * 3600 + int(match.group(2)) * 60 + int(match.group(3)) + int(frac) / 1000
+    match = re.match(r"^(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?$", value)
+    if match:
+        frac = (match.group(3) or "0").ljust(3, "0")[:3]
+        return int(match.group(1)) * 60 + int(match.group(2)) + int(frac) / 1000
+    raise ValueError(f"Invalid timecode: {value}")
+
+
+def seconds_timecode(value: float) -> str:
+    millis = int(round(value * 1000))
+    hours, rem = divmod(millis, 3600_000)
+    minutes, rem = divmod(rem, 60_000)
+    seconds, millis = divmod(rem, 1000)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{millis:03d}"
+
+
+def cleanup_appledouble_files(resources: Path) -> None:
+    removed = 0
+    for path in resources.rglob("._*"):
+        if path.is_file():
+            path.unlink()
+            removed += 1
+    if removed:
+        print(f"Removed {removed} macOS AppleDouble resource file(s).", flush=True)
+
+
+def find_avatar_image(resources: Path, explicit: str = "") -> Path:
+    if explicit:
+        path = Path(explicit)
+        path = path if path.is_absolute() else resources / path
+        if path.exists():
+            return path
+        raise FileNotFoundError(f"Avatar image not found: {path}")
+    for name in ("avatar.png", "avatar.jpg", "avatar.jpeg", "Avatar.png", "Avatar.jpg", "Avatar.jpeg"):
+        path = resources / name
+        if path.exists():
+            return path
+    matches = sorted(
+        path for path in resources.iterdir()
+        if path.is_file() and path.stem.lower() == "avatar" and path.suffix.lower() in {".png", ".jpg", ".jpeg"}
+    )
+    if matches:
+        return matches[0]
+    raise FileNotFoundError(f"No avatar image found in {resources}; expected avatar.png, avatar.jpg, or avatar.jpeg")
+
+
+def read_ebook_promo_ranges(path: Path, final_duration: float) -> list[dict]:
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Ebook promo time file not found: {path}. "
+            "Create it with lines like: 03:00.200 - 03:14.450"
+        )
+    ranges = []
+    for line_no, raw_line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), start=1):
+        line = raw_line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        match = re.match(
+            r"^(\d{1,2}:\d{1,2}(?::\d{1,2})?(?:\.\d{1,3})?)\s*(?:-|,|to|->)\s*"
+            r"(\d{1,2}:\d{1,2}(?::\d{1,2})?(?:\.\d{1,3})?)$",
+            line,
+            flags=re.IGNORECASE,
+        )
+        if not match:
+            raise ValueError(f"Invalid ebook promo range at {path}:{line_no}: {raw_line}")
+        start = timecode_seconds(match.group(1))
+        end = timecode_seconds(match.group(2))
+        if end <= start:
+            raise ValueError(f"Ebook promo end must be after start at {path}:{line_no}: {raw_line}")
+        if start >= final_duration:
+            raise ValueError(
+                f"Ebook promo start {seconds_timecode(start)} is outside final duration "
+                f"{seconds_timecode(final_duration)} at {path}:{line_no}"
+            )
+        end = min(end, final_duration)
+        ranges.append({"start": start, "end": end, "duration": end - start})
+    ranges.sort(key=lambda item: item["start"])
+    for prev, current in zip(ranges, ranges[1:]):
+        if current["start"] < prev["end"]:
+            raise ValueError(
+                f"Ebook promo ranges overlap: {seconds_timecode(prev['start'])}-{seconds_timecode(prev['end'])} "
+                f"and {seconds_timecode(current['start'])}-{seconds_timecode(current['end'])}"
+            )
+    if not ranges:
+        raise ValueError(f"No ebook promo ranges found in {path}")
+    return ranges
+
+
+def find_storyboard(resources: Path, explicit: str = "") -> Path:
+    if explicit:
+        path = Path(explicit)
+        return path if path.is_absolute() else resources / path
+    for name in ("storyboard.xlsx", "Storyboard.xlsx", "storyboard_elias_yoder.xlsx"):
+        path = resources / name
+        if path.exists() and not path.name.startswith("._"):
+            return path
+    matches = sorted(path for path in resources.glob("*.xlsx") if not path.name.startswith(("~$", "._")))
+    if matches:
+        return matches[0]
+    raise FileNotFoundError(f"No storyboard XLSX found in {resources}")
 
 
 def normalize_scene_type(value: str) -> str:
@@ -46,20 +145,6 @@ def normalize_scene_type(value: str) -> str:
     }
     key = " ".join((value or "").strip().lower().split())
     return mapping.get(key, (value or "").strip())
-
-
-def find_storyboard(resources: Path, explicit: str = "") -> Path:
-    if explicit:
-        path = Path(explicit)
-        return path if path.is_absolute() else resources / path
-    for name in ("storyboard.xlsx", "storyboard_elias_yoder.xlsx"):
-        path = resources / name
-        if path.exists():
-            return path
-    matches = sorted(path for path in resources.glob("*.xlsx") if not path.name.startswith("~$"))
-    if matches:
-        return matches[0]
-    raise FileNotFoundError(f"No storyboard XLSX found in {resources}")
 
 
 def read_storyboard(path: Path, first: int, last: int) -> list[dict]:
@@ -232,6 +317,106 @@ def assemble_split(ffmpeg: str, left: Path, right: Path, destination: Path) -> N
     ], f"Failed split-screen: {destination}")
 
 
+def apply_ebook_promo(
+    ffmpeg: str,
+    source_video: Path,
+    ebook_video: Path,
+    promo_ranges: list[dict],
+    work_dir: Path,
+    output_video: Path,
+    fps: int,
+    final_duration: float,
+) -> None:
+    if not ebook_video.exists():
+        raise FileNotFoundError(f"Ebook promo video not found: {ebook_video}")
+
+    promo_dir = work_dir / "ebook-promo-segments"
+    if promo_dir.exists():
+        shutil.rmtree(promo_dir)
+    promo_dir.mkdir(parents=True, exist_ok=True)
+    parts = []
+    cursor = 0.0
+
+    def encode_source_part(start: float, end: float, index: int) -> None:
+        if end <= start:
+            return
+        part = promo_dir / f"{index:04d}_source.mp4"
+        if part.exists():
+            parts.append(part)
+            return
+        run([
+            ffmpeg, "-nostdin", "-y",
+            "-ss", f"{start:.3f}",
+            "-t", f"{end - start:.3f}",
+            "-i", str(source_video),
+            "-map", "0:v:0",
+            "-vf", (
+                "scale=1920:1080:force_original_aspect_ratio=increase,"
+                f"crop=1920:1080,fps={fps},format=yuv420p"
+            ),
+            "-an",
+            "-c:v", "libx264",
+            "-preset", "medium",
+            "-b:v", "10M",
+            "-maxrate", "12M",
+            "-bufsize", "20M",
+            "-r", str(fps),
+            "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart",
+            str(part),
+        ], f"Failed to prepare source promo part: {part}")
+        parts.append(part)
+
+    def encode_ebook_part(duration: float, index: int) -> None:
+        part = promo_dir / f"{index:04d}_ebook.mp4"
+        if part.exists():
+            parts.append(part)
+            return
+        run([
+            ffmpeg, "-nostdin", "-y",
+            "-i", str(ebook_video),
+            "-t", f"{duration:.3f}",
+            "-vf", (
+                "scale=1920:1080:force_original_aspect_ratio=increase,"
+                f"crop=1920:1080,fps={fps},format=yuv420p"
+            ),
+            "-an",
+            "-c:v", "libx264",
+            "-preset", "medium",
+            "-b:v", "10M",
+            "-maxrate", "12M",
+            "-bufsize", "20M",
+            "-r", str(fps),
+            "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart",
+            str(part),
+        ], f"Failed to prepare ebook promo part: {part}")
+        parts.append(part)
+
+    part_index = 0
+    for promo in promo_ranges:
+        encode_source_part(cursor, promo["start"], part_index)
+        part_index += 1
+        encode_ebook_part(promo["duration"], part_index)
+        part_index += 1
+        cursor = promo["end"]
+    encode_source_part(cursor, final_duration, part_index)
+
+    def concat_quote(path: Path) -> str:
+        return "'" + str(path).replace("'", "'\\''") + "'"
+
+    concat_list = promo_dir / "ebook-promo-concat.txt"
+    concat_list.write_text("\n".join(f"file {concat_quote(part)}" for part in parts) + "\n", encoding="utf-8")
+    run([
+        ffmpeg, "-nostdin", "-y",
+        "-f", "concat",
+        "-safe", "0",
+        "-i", str(concat_list),
+        "-c", "copy",
+        str(output_video),
+    ], f"Failed to concat ebook promo video: {output_video}")
+
+
 def assemble_youtube_final(
     ffmpeg: str,
     scenes: list[dict],
@@ -242,6 +427,8 @@ def assemble_youtube_final(
     output: Path,
     fps: int,
     motion_speed: float,
+    ebook_video: Path,
+    ebook_promo_times: Path,
 ) -> None:
     frame_rows = ["scene,type,frames"]
     previous_end_frame = 0
@@ -308,6 +495,7 @@ def assemble_youtube_final(
 
     concat_list = work_dir / "assemble-motion-0.6x-youtube1080-concat.txt"
     concat_video = work_dir / "assemble-motion-0.6x-youtube1080-video-only.mp4"
+    promo_video = work_dir / "assemble-motion-0.6x-youtube1080-ebook-promo-video-only.mp4"
     concat_list.write_text(
         "\n".join(f"file {concat_quote(segment_dir / f'{idx:04d}_scene_{item['scene']}.mp4')}" for idx, item in enumerate(scenes)) + "\n",
         encoding="utf-8",
@@ -321,9 +509,17 @@ def assemble_youtube_final(
         str(concat_video),
     ], f"Final video concat failed: {concat_video}")
 
+    promo_ranges = read_ebook_promo_ranges(ebook_promo_times, duration)
+    print(
+        "Applying ebook promo ranges: "
+        + ", ".join(f"{seconds_timecode(item['start'])}-{seconds_timecode(item['end'])}" for item in promo_ranges),
+        flush=True,
+    )
+    apply_ebook_promo(ffmpeg, concat_video, ebook_video, promo_ranges, work_dir, promo_video, fps, duration)
+
     run([
         ffmpeg, "-nostdin", "-y",
-        "-i", str(concat_video),
+        "-i", str(promo_video),
         "-i", str(voice),
         "-map", "0:v:0",
         "-map", "1:a:0",
@@ -334,7 +530,11 @@ def assemble_youtube_final(
         "-movflags", "+faststart",
         str(output),
     ], f"Final YouTube assembly failed: {output}")
-    print(f"Created {output} with {total_frames} frames ({duration:.3f}s). Motion slowed: {motion_count}", flush=True)
+    print(
+        f"Created {output} with {total_frames} frames ({duration:.3f}s), "
+        f"{len(promo_ranges)} ebook promo range(s). Motion slowed: {motion_count}",
+        flush=True,
+    )
 
 
 def main() -> int:
@@ -347,10 +547,13 @@ def main() -> int:
     parser.add_argument("--comfy-input-dir", default="/workspace/ComfyUI/input")
     parser.add_argument("--first-scene", type=int, default=1)
     parser.add_argument("--last-scene", type=int, default=3)
-    parser.add_argument("--fps", type=int, default=24)
+    parser.add_argument("--fps", type=int, default=25)
     parser.add_argument("--motion-frames", type=int, default=85)
     parser.add_argument("--motion-speed", type=float, default=0.6)
-    parser.add_argument("--final-name", default="final_video_motion_0_6x_youtube1080_corrected.mp4")
+    parser.add_argument("--final-name", default="final_video_motion_0_6x_youtube1080_25fps_ebook_promo_10M.mp4")
+    parser.add_argument("--avatar-image", default="")
+    parser.add_argument("--ebook-video", default="New_Ebook.mov")
+    parser.add_argument("--ebook-promo-times", default="ebook_promo_times.txt")
     parser.add_argument("--avatar-lead-in", type=float, default=0.0)
     parser.add_argument("--avatar-gain-db", type=float, default=0.0)
     parser.add_argument("--force", action="store_true")
@@ -359,6 +562,7 @@ def main() -> int:
 
     ffmpeg = "ffmpeg"
     resources = Path(args.resources)
+    cleanup_appledouble_files(resources)
     output = Path(args.output_dir)
     video_dir = output / "videos"
     audio_dir = output / "avatar-audio"
@@ -371,7 +575,11 @@ def main() -> int:
     scenes = read_storyboard(storyboard, args.first_scene, args.last_scene)
     timestamps = read_timestamps(resources / "time_stamp.csv", args.first_scene, args.last_scene)
     avatar_prompt = (resources / "Prompt_for_avatar.txt").read_text(encoding="utf-8").strip()
-    avatar_image = resources / "avatar.png"
+    avatar_image = find_avatar_image(resources, args.avatar_image)
+    ebook_video = Path(args.ebook_video)
+    ebook_video = ebook_video if ebook_video.is_absolute() else resources / ebook_video
+    ebook_promo_times = Path(args.ebook_promo_times)
+    ebook_promo_times = ebook_promo_times if ebook_promo_times.is_absolute() else resources / ebook_promo_times
     comfy_input = Path(args.comfy_input_dir)
     templates = Path(args.template_dir)
 
@@ -498,6 +706,8 @@ def main() -> int:
             final_path,
             args.fps,
             args.motion_speed,
+            ebook_video,
+            ebook_promo_times,
         )
     return 0
 

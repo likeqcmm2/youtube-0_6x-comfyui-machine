@@ -1,0 +1,6 @@
+# Copy this file to /root/Resources/ebook_promo_times.txt and edit the ranges each day.
+# Format: start - end
+# Time can be HH:MM:SS.mmm or MM:SS.mmm.
+
+03:00.200 - 03:14.450
+17:53.550 - 18:05.800

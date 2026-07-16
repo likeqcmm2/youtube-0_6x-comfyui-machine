@@ -11,7 +11,7 @@ It installs and drives the current ComfyUI pipeline that replaces the old LTX De
 - The final YouTube export is:
 
 ```text
-/root/Resources/production_output_comfy/final_video_motion_0_6x_youtube1080_corrected.mp4
+/root/Resources/production_output_comfy/final_video_motion_0_6x_youtube1080_25fps_ebook_promo_10M.mp4
 ```
 
 Motion scenes are slowed to **0.6x** during final assembly. Timing still follows the hard `time_stamp.csv` file.
@@ -38,8 +38,10 @@ Each day, upload your current `Resources` folder to the Vast server:
   storyboard.xlsx                         # or any .xlsx storyboard file
   time_stamp.csv                          # required; timestamps always come from this file
   voice_over.mp3
-  avatar.png
+  avatar.png                              # avatar.jpg and avatar.jpeg are also supported
   Prompt_for_avatar.txt
+  New_Ebook.mov
+  ebook_promo_times.txt
   output_scenes/
     scene_1.png
     scene_2.png
@@ -65,6 +67,25 @@ Supported scene types:
 - `Still Image + Ken Burn`
 - `Split screen`
 - `Avatar/Split-screen`
+
+The workflow removes macOS AppleDouble files such as `._Storyboard.xlsx` and `._avatar.jpeg` before reading resources, so archives created on macOS are safe to use.
+
+## Ebook Promo Times
+
+The final export always includes Ebook promo replacements. Put the daily replacement ranges in:
+
+```text
+/root/Resources/ebook_promo_times.txt
+```
+
+Each non-empty line is one replacement range:
+
+```text
+03:00.200 - 03:14.450
+17:53.550 - 18:05.800
+```
+
+Accepted time formats are `HH:MM:SS.mmm` and `MM:SS.mmm`. For each range, the script takes the same duration from the beginning of `/root/Resources/New_Ebook.mov`, scales/crops it to 1920x1080 at 25fps, replaces only the video in that final timeline range, and keeps the original `voice_over.mp3` audio.
 
 ## New Vast Server Setup
 
@@ -131,19 +152,14 @@ python3 ltx_comfyui_workflow.py \
   --resources /root/Resources \
   --first-scene 1 \
   --last-scene 3 \
-  --force
+  --force \
+  --skip-assemble
 ```
 
 Output clips are written to:
 
 ```text
 /root/Resources/production_output_comfy/videos/
-```
-
-The test final is written to:
-
-```text
-/root/Resources/production_output_comfy/final_video_motion_0_6x_youtube1080_corrected.mp4
 ```
 
 ## Run Full Production
@@ -190,7 +206,7 @@ workflows/LTX_I2V_FFLF_85frames_input_enabled.json
 - Default frame count:
 
 ```text
-85 frames at 24fps
+85 frames at 25fps
 ```
 
 This is approximately 3.5 seconds before final timestamp trimming.
@@ -202,6 +218,8 @@ This is approximately 3.5 seconds before final timestamp trimming.
 ```text
 /root/Resources/avatar.png
 ```
+
+`avatar.jpg` and `avatar.jpeg` are also accepted automatically.
 
 - Source audio:
 
@@ -238,13 +256,15 @@ The combined split-screen keeps avatar audio.
 Final assembly:
 
 - Converts scene video to 1920x1080.
-- Uses 24fps frame-accurate boundaries.
+- Uses 25fps frame-accurate boundaries.
 - Slows only `Motion` scenes to 0.6x.
+- Replaces Ebook promo ranges from `ebook_promo_times.txt` with `New_Ebook.mov`.
+- Encodes the final video path at 10M video bitrate, 12M maxrate, 20M buffer, and 384k AAC audio.
 - Maps the full original `voice_over.mp3` as final audio.
 - Writes:
 
 ```text
-/root/Resources/production_output_comfy/final_video_motion_0_6x_youtube1080_corrected.mp4
+/root/Resources/production_output_comfy/final_video_motion_0_6x_youtube1080_25fps_ebook_promo_10M.mp4
 ```
 
 ## Useful Logs
@@ -271,5 +291,5 @@ Use `--force` to regenerate.
     scene_N_1.mp4
     scene_N_2.mp4
   work/
-  final_video_motion_0_6x_youtube1080_corrected.mp4
+  final_video_motion_0_6x_youtube1080_25fps_ebook_promo_10M.mp4
 ```
