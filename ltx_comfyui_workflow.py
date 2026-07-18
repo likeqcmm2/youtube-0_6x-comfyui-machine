@@ -174,10 +174,11 @@ def read_storyboard(path: Path, first: int, last: int) -> list[dict]:
         return cells.get(ref, "").strip()
 
     headers = {col: cell(f"{col}1") for col in ("A", "B", "C", "D", "E")}
+    type_header = headers["D"].lower()
     new_format = (
         headers["A"].lower() == "timecode"
         and "prompt" in headers["C"].lower()
-        and "loại" in headers["D"].lower()
+        and ("loại" in type_header or "loai" in type_header)
     )
 
     scenes = []
